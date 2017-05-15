@@ -97,6 +97,10 @@ open class MockSession : Session {
       .filter { _ in self.isBrowsing }
       .map { $0.map { ($0.iden, $0.meta) } }
   }
+  
+  public func stateChanges() -> Observable<(MockIden, MCSessionState)> {
+    return PublishSubject()
+  }
 
   open func incomingConnections() -> Observable<(I, [String: Any]?, (Bool) -> ())> {
     return rx_connectRequests.filter { _ in self.isAdvertising }
