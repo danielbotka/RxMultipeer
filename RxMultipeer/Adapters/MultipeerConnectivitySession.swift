@@ -5,7 +5,7 @@ import MultipeerConnectivity
 
 /// A RxMultipeer adapter for Apple's MultipeerConnectivity framework.
 open class MultipeerConnectivitySession : NSObject, Session {
-
+  
   public typealias I = MCPeerID
 
   open let session: MCSession
@@ -22,6 +22,7 @@ open class MultipeerConnectivitySession : NSObject, Session {
   fileprivate let _incomingConnections: PublishSubject<(MCPeerID, [String: Any]?, (Bool, MCSession?) -> Void)> = PublishSubject()
   fileprivate let _incomingCertificateVerifications: PublishSubject<(MCPeerID, [Any]?, (Bool) -> Void)> = PublishSubject()
   fileprivate let _connections = Variable<[MCPeerID]>([])
+  fileprivate let _stateChanges: PublishSubject<(MCPeerID, MCSessionState)> = PublishSubject()
   fileprivate let _nearbyPeers: Variable<[(MCPeerID, [String: String]?)]> = Variable([])
   fileprivate let _connectionErrors: PublishSubject<Error> = PublishSubject()
   fileprivate let _receivedData: PublishSubject<(MCPeerID, Data)> = PublishSubject()
@@ -112,6 +113,10 @@ open class MultipeerConnectivitySession : NSObject, Session {
 
   open func nearbyPeers() -> Observable<[(MCPeerID, [String: String]?)]> {
     return _nearbyPeers.asObservable()
+  }
+  
+  open func stateChanges() -> Observable<(I, MCSessionState)> {
+    return _stateChanges.asObservable()
   }
 
   /// - Seealso: `MCNearbyServiceBrowser.startBrowsingForPeers()`
@@ -397,11 +402,12 @@ extension MultipeerConnectivitySession : MCSessionDelegateWrapperDelegate {
   public func session(_ session: MCSession,
                       peer peerID: MCPeerID,
                       didChange state: MCSessionState) {
+    // Push state change event
+    _stateChanges.on(.next((peerID, state)))
     // If the peer is connecting, then we know that connected peers has not
     // changed, so we can avoid re-emitting the observable by not setting the value
-    if state != .connecting {
-      _connections.value = session.connectedPeers
-    }
+    guard state != .connecting else { return }
+    _connections.value = session.connectedPeers
   }
 
   public func session(_ session: MCSession,
